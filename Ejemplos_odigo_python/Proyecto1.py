@@ -6,19 +6,19 @@ import sys, getopt
 
 sys.path.append('.')
 import threading
+import _thread
 import RTIMU
 import os.path
 import time
 import math
 
 sense = SenseHat()
-global Gx,Gy,Gz, sample
-datosGx = ""
-sample = 0
+
+stop = 0
 Gx = 0
 Gy = 0
 Gz = 0
-stop = 0
+c = 0
 
 SETTINGS_FILE = "RTIMULib"
 
@@ -90,26 +90,73 @@ def saveData():
     stop = 1
     return
 
-#Bucle de ejecucion
+class myThread (threading.Thread):
+   def __init__(self, threadID, name, counter):
+      threading.Thread.__init__(self)
+      self.threadID = threadID
+      self.name = name
+      self.counter = counter
+   def run(self):
+      while True:
+          adquisitionData()
+#Funcion que solicita la adquisición de datos de forma periodica según fm en milisegundos.
+fm = 1000#en milisegundos
+datosGx = ""
+sample = 0
+def adquisitionData():
+    global sample, flag
+    t0 = time.time()
+    #Se guardan los datos para tratamiento posterior
+    #datosGx += ("%f, " %Gx)
+    sample += 1
+    flag = 1
+    time.sleep(fm/1000.0)
+    lapsetime = ((time.time() - t0) * 1000 )
+    print("\n Gx: %1.8f - Gy: %1.8f - Gz: %1.8f - Samp = %i - SampTime = %f ms" % (Gx,Gy, Gz,sample,lapsetime),end = '\n')
 
-#configuracion del threads
-threading.Thread(target=saveData).start()
-#threading.Thread(target=showrow).start()
 
-while (stop == 0):
-    timeIni = int(round(time.time() * 1000))
-    if imu.IMURead():
+
+
+#Obtiene los datos del IMU
+class myThread2 (threading.Thread):
+   def __init__(self, threadID, name, counter):
+      threading.Thread.__init__(self)
+      self.threadID = threadID
+      self.name = name
+      self.counter = counter
+   def run(self):
+       while True:
+          Dataget()
+
+flag = 1
+def Dataget ():
+    global Gx
+    global Gy
+    global Gz
+    global c
+    global flag
+    #timeIni = int(round(time.time() * 1000000))
+    t0 = time.time()
+    if (imu.IMURead() and flag == 1):
         data = imu.getIMUData()
-        sample += 1
         #Se obtiene el dato de aceleracion en la variable accel
         accel = data["accel"]
         Gx = accel[0]
         Gy = accel[1]
         Gz = accel[2]
-        #Se guardan los datos para tratamiento posterior
-        datosGx += ("%f, " %Gy)
         #Tiempo de espera
         #time.sleep(poll_interval*1.0/1000.0)
-        timeEnd = int(round(time.time() * 1000))
-        c = (timeEnd - timeIni)
-        print("Gx: %1.8f - Gy: %1.8f - Gz: %1.8f - Samp = %i - Time: %i ms.   " % (Gx,Gy,Gz,sample,c),end='\r')
+        c = (time.time() - t0) * 1000
+        print("IMU Data - Time: %3.3f ms  " % (c), end ='\n')
+        flag = 0
+
+
+# Create new threads
+thread1 = myThread(1, "Thread-1", 1)
+thread2 = myThread2(2, "Thread-2", 2)
+
+# Start new Threads
+thread1.start()
+thread2.start()
+
+print ("Exiting Main Thread")
