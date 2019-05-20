@@ -25,9 +25,11 @@ numSamples = 0 #Numero de muestras tomadas
 datosGx = ""    #Variable donde almacenar el array de muestras.
 datosGy = ""    #Variable donde almacenar el array de muestras.
 datosGz = ""    #Variable donde almacenar el array de muestras.
-stop = 0        #VFlag de parada de los procesos
+stopthread3 = 0        #VFlag de parada de los procesos
 stopthread2 = 0
 stopthread1 = 0
+accelArrx = []
+offsetX = 0     #Variable del valor de offset para Eje X
 
 SETTINGS_FILE = "RTIMULib"
 
@@ -59,27 +61,41 @@ print("Recommended Poll Interval: %dmS" % poll_interval)
 #########################################################################
 #Declaracion Thread SaveData
 class SaveDataTrhead (threading.Thread):
-   def __init__(self, threadID, name):
-      threading.Thread.__init__(self)
-      self.threadID = threadID
-      self.name = name
-   def run(self):
-      global stopthread2,stopthread1
-      print ("\nStarting " + self.name)
-      #Se crea un fichero de datos nuevo vacio.
-      print("\nEsperando joystick para guardar Datos:")
-      event = sense.stick.wait_for_event()
-      if os.path.exists("GxData.txt"):
-           print("\nSe elimina GxData.txt")
-           os.remove("GxData.txt")
-      else:
-           print("\nSe crea : GxData.txt")
-           fGx = open("GxData.txt", "a")
-           fGx.write(datosGx)
-      print ("\nExiting " + self.name)
-      stopthread2 = 1
-      time.sleep(500/1000)
-      stopthread1 = 1
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+#Rutina de autoejecución
+    def run(self):
+
+        global stopthread2,stopthread1, stopthread3,offsetX
+
+        print ("\nStarting " + self.name)
+        #Se crea un fichero de datos nuevo vacio.
+        if os.path.exists("GxData.txt"):
+            print("\nSe elimina GxData.txt anterior.")
+            os.remove("GxData.txt")
+        print("\nSe crea : GxData.txt")
+        fGx = open("GxData.txt", "a")
+        print("\nEsperando joystick para opcion:")
+        #Bucle de captura de entradas del joystick.
+        while stopthread3 == 0:
+            event = sense.stick.wait_for_event()
+            #Boton central: Calibrar acelerometro en posicion de reposo.
+            if (event.direction == "middle"):
+                suma = 0
+                for x in accelArrx:
+                    suma = suma + x
+                offsetX = suma / len(accelArrx)
+                print("\nOffset en X = %f."% offsetX, end='\n')
+            #Otro Boton: Guardar fichero y cerrar programa.
+            else:
+                fGx.write(datosGx)
+                print ("\nExiting " + self.name)
+                stopthread2 = 1
+                time.sleep(500/1000)
+                stopthread1 = 1
+                stopthread3 =  1
 
 #Declaracion Thread 1
 class myThread (threading.Thread):
@@ -89,7 +105,7 @@ class myThread (threading.Thread):
       self.name = name
    def run(self):
       #Se ejecuta la función de adquisición de muestras
-      print ("\nStarting " + self.name)
+      print ("Starting " + self.name)
       while stopthread1 == 0:
           adquisitionData(12)
       print ("\nExiting " + self.name)
@@ -102,22 +118,29 @@ class myThread2 (threading.Thread):
       self.threadID = threadID
       self.name = name
    def run(self):
-      print ("\nStarting " + self.name)
+      print ("Starting " + self.name)
       while stopthread2 == 0:
           Dataget(10)
       print ("\nExiting " + self.name)
 
 #Funcion del thread 1
 def adquisitionData(tiempo):
-    global datosGx, datosGy, datosGz, numSamples
+    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx
+    offsetGx = 0
     t0 = time.time()
-    datosGx += ("%f, " %Gx)
-    numSamples = numSamples +1
+    accelArrx.append (Gx)
+    #secorrige el valor de Gx
+    if (offsetX != 0):
+        offsetGx = Gx - offsetX
+        if (abs(offsetGx) < 0.005): #0.005
+            offsetGx = 0
+        datosGx += ("%f, " % (offsetGx))
+        numSamples = numSamples +1
+    #Se setean el flag de thread para permitir al trhead de adquisición, tomar el dato.
     event.set()
     time.sleep(tiempo/1000.0)
     lapsetime = ((time.time() - t0) * 1000 )
-    print("Gx: %1.4f Gy: %1.4f Gz: %1.4f - #Samples = %i SampleTime = %f ms - IMUTime = %f" % (Gx,Gy,Gz,numSamples,lapsetime, timeIMU), end = '\r')
-
+    print("Gx: %1.4f Gy: %1.4f Gz: %1.4f - #Samples = %i SampleTime = %f ms - IMUTime = %f" % (Gx-offsetX,Gy,Gz,numSamples,lapsetime, timeIMU), end = '\r')
 #Funcion del thread 2
 def Dataget (tiempo):
     global Gx, Gy, Gz, timeIMU
@@ -140,7 +163,10 @@ thread2 = myThread2(2, "Thread-2")
 thread3 = SaveDataTrhead(2, "SaveDataTrhead")
 
 # Start new Threads
-thread1.start()
-thread2.start()
 thread3.start()
+time.sleep(100/1000)
+thread2.start()
+thread1.start()
+
+
 print ("\nExiting Main Thread")
