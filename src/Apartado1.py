@@ -3,6 +3,8 @@ from sense_hat import SenseHat
 from datetime import datetime
 from datetime import time
 import sys, getopt
+import numpy as np
+import array as ar
 
 sys.path.append('.')
 import threading
@@ -46,6 +48,13 @@ imu.setCompassEnable(True)
 
 poll_interval = imu.IMUGetPollInterval()
 print("Recommended Poll Interval: %dmS\n" % poll_interval)
+
+#Filtro passa bajos Apartado1
+coef = ar.array('d',[-595,-595,-746,883,4896,9503,11565,9503,4896,883,-746,-595])
+s = ('d',[1,-1,1])
+r = np.convolve(coef,s,'same')
+print(r)
+
 
 #Callback the thread para mostrar orientaciÃ³n por pantalla
 def showrow():
