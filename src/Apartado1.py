@@ -50,7 +50,7 @@ poll_interval = imu.IMUGetPollInterval()
 print("Recommended Poll Interval: %dmS\n" % poll_interval)
 
 #Filtro passa bajos Apartado1
-coef = ar.array('d',[-595,-595,-746,883,4896,9503,11565,9503,4896,883,-746,-595])
+coef = ar.array('d',[ -405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
 s = ('d',[1,-1,1])
 r = np.convolve(coef,s,'same')
 print(r)
