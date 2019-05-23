@@ -50,10 +50,42 @@ poll_interval = imu.IMUGetPollInterval()
 print("Recommended Poll Interval: %dmS\n" % poll_interval)
 
 #Filtro passa bajos Apartado1
-coef = ar.array('d',[ -405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
-s = ('d',[1,-1,1])
-r = np.convolve(coef,s,'same')
+
+etapes = 15
+histroy = [0] * etapes
+last_index = 0
+coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
+
+def SampleFilter_put ():
+    global history, last_index
+    input = 0
+    history[last_index += 1] = input
+    if (last_index == etapes):
+        last_index = 0
+
+def SampleFilter_get ():
+    global last_index, coef
+    acc = 0L
+    i = 0
+    index = last_index
+    for i in range(etapes):
+        if index != 0:
+            index = index -= 1
+        else
+            index = etapes -1
+
+        acc = acc + history[index] * coef[i]
+
+
+    return acc >> 16
+
+"""coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
+s = ar.array('i',[1,-1,1])
+r = np.convolve(s,coef,'same')
 print(r)
+"""
+
+
 
 
 #Callback the thread para mostrar orientaciÃ³n por pantalla
