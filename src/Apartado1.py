@@ -59,22 +59,22 @@ coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-
 def SampleFilter_put ():
     global history, last_index
     input = 0
-    history[last_index += 1] = input
+    history[last_index + 1] = input
     if (last_index == etapes):
         last_index = 0
 
 def SampleFilter_get ():
     global last_index, coef
-    acc = 0L
+    acc = 0
     i = 0
     index = last_index
     for i in range(etapes):
         if index != 0:
-            index = index -= 1
+            index = index - 1
         else
             index = etapes -1
 
-        acc = acc + history[index] * coef[i]
+    acc = acc + history[index] * coef[i]
 
 
     return acc >> 16

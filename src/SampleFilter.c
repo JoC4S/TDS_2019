@@ -18,7 +18,7 @@ void SampleFilter_init(SampleFilter* f) {
   int i;
   for(i = 0; i < SAMPLEFILTER_TAP_NUM; ++i)
     f->history[i] = 0;
-  f->last_index = 0;
+    f->last_index = 0;
 }
 
 void SampleFilter_put(SampleFilter* f, int input) {
