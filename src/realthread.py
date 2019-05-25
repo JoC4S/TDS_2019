@@ -30,6 +30,7 @@ stopthread2 = 0
 stopthread1 = 0
 accelArrx = []
 offsetX = 0     #Variable del valor de offset para Eje X
+rawGx = ""
 
 SETTINGS_FILE = "RTIMULib"
 
@@ -75,8 +76,10 @@ class SaveDataTrhead (threading.Thread):
         if os.path.exists("GxData.txt"):
             print("\nSe elimina GxData.txt anterior.")
             os.remove("GxData.txt")
+            os.remove("GxRawData.txt")
         print("\nSe crea : GxData.txt")
         fGx = open("GxData.txt", "a")
+        fRawGx = open("GxRawData.txt", "a")
         print("\nEsperando joystick para opcion:")
         #Bucle de captura de entradas del joystick.
         while stopthread3 == 0:
@@ -91,6 +94,7 @@ class SaveDataTrhead (threading.Thread):
             #Otro Boton: Guardar fichero y cerrar programa.
             else:
                 fGx.write(datosGx)
+                fRawGx.write(rawGx)
                 print ("\nExiting " + self.name)
                 stopthread2 = 1
                 time.sleep(500/1000)
@@ -107,7 +111,7 @@ class myThread (threading.Thread):
       #Se ejecuta la función de adquisición de muestras
       print ("Starting " + self.name)
       while stopthread1 == 0:
-          adquisitionData(12)
+          adquisitionData(15)
       print ("\nExiting " + self.name)
 
 
@@ -120,21 +124,22 @@ class myThread2 (threading.Thread):
    def run(self):
       print ("Starting " + self.name)
       while stopthread2 == 0:
-          Dataget(10)
+          Dataget(12)
       print ("\nExiting " + self.name)
 
 #Funcion del thread 1
 def adquisitionData(tiempo):
-    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx
+    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx, rawGx
     offsetGx = 0
     t0 = time.time()
     accelArrx.append (Gx)
     #secorrige el valor de Gx
     if (offsetX != 0):
         offsetGx = Gx - offsetX
-        if (abs(offsetGx) < 0.005): #0.005
+        if (abs(offsetGx) < 0.005):
             offsetGx = 0
         datosGx += ("%f, " % (offsetGx))
+        rawGx  += ("%f, " % (Gx))
         numSamples = numSamples +1
     #Se setean el flag de thread para permitir al trhead de adquisición, tomar el dato.
     event.set()
@@ -146,15 +151,19 @@ def Dataget (tiempo):
     global Gx, Gy, Gz, timeIMU
     event.wait() # Blocks until the flag becomes true.
     t0 = time.time()
-    if imu.IMURead():
-        data = imu.getIMUData()
-        #Se obtiene el dato de aceleracion en la variable accel
-        accel = data["accel"]
-        Gx = accel[0]
-        Gy = accel[1]
-        Gz = accel[2]
-        timeIMU = (time.time() - t0) * 1000
-        #print ("IMU Time : %f ms" %timeIMU)
+    i = 0
+    while (imu.IMURead() == 0):
+        time.sleep(0.25/1000.0)
+
+    data = imu.getIMUData()
+    #Se obtiene el dato de aceleracion en la variable accel
+    accel = data["accel"]
+    Gx = accel[0]
+    Gy = accel[1]
+    Gz = accel[2]
+    timeIMU = (time.time() - t0) * 1000
+    if (timeIMU > (tiempo)):
+        print ("IMU Delay.")
     event.clear() # Resets the flag.
 
 # Create new threads
