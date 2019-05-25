@@ -54,7 +54,7 @@ print("Recommended Poll Interval: %dmS\n" % poll_interval)
 etapes = 15
 histroy = [0] * etapes
 last_index = 0
-coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
+coef = ar.array('i',[-435,-745,-1002,-884,-162,1224,3085,4997,6435,6970,6435,4997,3085,1224,-162,-884,-1002,-745,-435])
 
 def SampleFilter_put ():
     global history, last_index
