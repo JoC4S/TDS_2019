@@ -60,14 +60,14 @@ print("Recommended Poll Interval: %dmS" % poll_interval)
 
 #Filtro passa bajos Apartado1
 
-etapes = 15
+etapes = 19
 histroy = [0] * etapes
 last_index = 0
 coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
 
 def SampleFilter_put ():
     global history, last_index
-    input = 0
+    input = 0					#input seria detos Gx del accelerometro
     history[last_index + 1] = input
     if (last_index == etapes):
         last_index = 0
