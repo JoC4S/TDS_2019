@@ -59,9 +59,6 @@ imu.setGyroEnable(False)
 imu.setAccelEnable(True)
 imu.setCompassEnable(False)
 
-poll_interval = imu.IMUGetPollInterval()
-print("Recommended Poll Interval: %dmS" % poll_interval)
-
 #Filtro passa bajos Apartado1
 
 etapes = 20
@@ -71,11 +68,10 @@ historyZ = [0] * etapes
 last_index = 0
 #coef = ar.array('i',[-435,-745,-1002,-884,-162,1224,3085,4997,6435,6970,6435,4997,3085,1224,-162,-884,-1002,-745,-435])
 coef = ar.array('i',[
-     283,    546,    872,   1247,   1652,   2061,   2448,   2785,   3046,
-     3211,   3268,   3211,   3046,   2785,   2448,   2061,   1652,   1247,
-      872,    546,    283])
-#123 etapas
-#coef = ar.array('i',[-1650,26,23,18,11,2,-8,-21,-35,-50,-67,-84,-102,-120,-139,-157,-174,-191,-206,-220,-232,-241,-248,-252,-252,-249,-243,-232,-218,-199,-176,-149,-117,-82,-42,2,49,100,154,211,270,332,395,459,524,589,653,716,778,838,895,949,1000,1047,1089,1126,1159,1186,1204,1223,1232,1236,1232,1223,1204,1186,1159,1126,1089,1047,1000,949,895,838,778,716,653,589,524,459,395,332,270,211,154,100,49,2,-42,-82,-117,-149,-176,-199,-218,-232,-243,-249,-252,-252,-248,-241,-232,-220,-206,-191,-174,-157,-139,-120,-102,-84,-67,-50,-35,-21,-8,2,11,18,23,26,1650])
+     -526,   -720,   -727,   -449,    164,   1090,   2232,   3424,   4471,
+     5189,   5444,   5189,   4471,   3424,   2232,   1090,    164,   -449,
+     -727,   -720,   -526])
+
 def SampleFilter_put ():
     global historyX,historyY, historyZ, last_index
     if (last_index == etapes):
@@ -101,10 +97,9 @@ def SampleFilter_get ():
             index = etapes -1
         accX = accX + (historyX[index] * coef[i])
         accY = accY + (historyY[index] * coef[i])
-        accZ = accZ + (historyZ[index] * coef[i])
-    accX = (accX / pow(2,16))*2
-    accY = (accY / pow(2,16))*2
-    accZ = (accZ / pow(2,16))*2
+    accX = (accX / pow(2,16))*1.923
+    accY = (accY / pow(2,16))*1.923
+    accZ = (accZ / pow(2,16))*1.923
     #print ("accX = %f , accY = %f , accZ = %f" %(accX, accY, accZ), end = '\r')
     return
 
@@ -119,8 +114,8 @@ def angulos():
         accY = 1
     elif (accY < -1):
         accY = -1
-    angX = math.degrees(math.acos(accX)) - 90
-    angY = math.degrees(math.acos(accY)) - 90
+    angX = math.degrees(math.acos(accX)) -90
+    angY = math.degrees(math.acos(accY)) -90
 
 #########################################################################
 
@@ -160,7 +155,7 @@ def adquisitionData(tiempo):
     event.set()
     time.sleep(tiempo/1000.0)
     lapsetime = ((time.time() - t0) * 1000 )
-    print("Gx: %1.3f Gy: %1.3f Gz: %1.3f - angX = %fº , angY = %fº SampleTime = %f ms - IMUTime = %f" % (accX,accY,accZ,angX,angY,lapsetime, timeIMU), end = '\r')
+    print("Gx: %1.2f Gy: %1.2f Gz: %1.2f - angX = %2.1fº , angY = %2.1fº SampleTime = %f ms - IMUTime = %f" % (accX,accY,accZ,angX,angY,lapsetime, timeIMU), end = '\r')
 #Funcion del thread 2
 def Dataget (tiempo):
     global Gx, Gy, Gz, timeIMU
