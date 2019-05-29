@@ -2,25 +2,34 @@
 from sense_hat import SenseHat
 from datetime import datetime
 from datetime import time
+from threading import Event, Thread
 import sys, getopt
-import numpy as np
-import array as ar
 
 sys.path.append('.')
 import threading
+import _thread
 import RTIMU
 import os.path
+import os
 import time
 import math
 
 sense = SenseHat()
-global Gx,Gy,Gz, sample
-datosGx = ""
-sample = 0
-Gx = 0
-Gy = 0
-Gz = 0
-stop = 0
+event = Event()
+
+Gx = 0          #almacena dato x Acelerometro
+Gy = 0          #almacena dato y Acelerometro
+Gz = 0          #almacena dato z Acelerometro
+timeIMU = 0     #Tiempo de proceso de la adquisicion de datos del IMU
+numSamples = 0 #Numero de muestras tomadas
+datosGx = ""    #Variable donde almacenar el array de muestras.
+datosGy = ""    #Variable donde almacenar el array de muestras.
+datosGz = ""    #Variable donde almacenar el array de muestras.
+stopthread3 = 0        #VFlag de parada de los procesos
+stopthread2 = 0
+stopthread1 = 0
+accelArrx = []
+offsetX = 0     #Variable del valor de offset para Eje X
 
 SETTINGS_FILE = "RTIMULib"
 
@@ -47,130 +56,191 @@ imu.setAccelEnable(True)
 imu.setCompassEnable(True)
 
 poll_interval = imu.IMUGetPollInterval()
-print("Recommended Poll Interval: %dmS\n" % poll_interval)
-
-#Filtro passa bajos Apartado1
-
-etapes = 15
-histroy = [0] * etapes
-last_index = 0
-coef = ar.array('i',[-435,-745,-1002,-884,-162,1224,3085,4997,6435,6970,6435,4997,3085,1224,-162,-884,-1002,-745,-435])
-
-def SampleFilter_put ():
-    global history, last_index
-    input = 0
-    history[last_index + 1] = input
-    if (last_index == etapes):
-        last_index = 0
-
-def SampleFilter_get ():
-    global last_index, coef
-    acc = 0
-    i = 0
-    index = last_index
-    for i in range(etapes):
-        if index != 0:
-            index = index - 1
-        else
-            index = etapes -1
-
-    acc = acc + history[index] * coef[i]
-
-
-    return acc >> 16
-
-""" coef_float = ar.array('f',[-0.013270861005761359,
--0.02272925807252496,
--0.03058117364530524,
--0.026990232978232324,
--0.004956272501515303,
-0.037360845300566166,
-0.0941520999988247,
-0.1524858523860024,
-0.19637793419313265,
-0.21270244563632562,
-0.19637793419313265,
-0.1524858523860024,
-0.0941520999988247,
-0.037360845300566166,
--0.004956272501515303,
--0.026990232978232324,
--0.03058117364530524,
--0.02272925807252496,
--0.013270861005761359
-])
-coef = ar.array('i',[-405,-682,-585,386,2357,4876,7020,7863,7020,4876,2357,386,-585,-682,-405])
-s = ar.array('i',[1,-1,1])
-r = np.convolve(s,coef,'same')
-print(r)
-"""
-
-
-
+print("Recommended Poll Interval: %dmS" % poll_interval)
 
 #Callback the thread para mostrar orientaciÃ³n por pantalla
+img = sense.clear()
 def showrow():
-    estado = 0;
-    while (stop == 0):
-        timeIni = int(round(time.time() * 1000))
-        #Se define el angulo de la imagen a mostrar.
-        if (Gz >= 0.5 and Gz > 0):
-            img = sense.load_image("dentro.png")
-        elif (Gz <= -0.5 and Gz < 0):
-            img = sense.load_image("fuera.png")
-        else:
-            img = sense.load_image("flecha.png")
-            if (Gx>= 0.95):
-                sense.rotation = 90
-            elif (Gx<=-0.95):
-                sense.rotation = 270
-            elif (Gy>= 0.95):
-                sense.rotation = 180
-            elif (Gy<= -0.95):
-                sense.rotation = 0
-        #Se muestra la imagen RGB
-        if (estado != sense.rotation):
-            sense.set_pixels(img)
-        timeEnd = int(round(time.time() * 1000))
-        c = (timeEnd - timeIni)
-        #print ("Gx: %f - Gy: %f - Gz: %f - Time: %i" % (Gx,Gy,Gz,c))
-
-def saveData():
-    global stop #Se utiliza para detener la ejecucion del programa cuando acba el thread
-    stop = 0
-    milli_secIni = int(round(time.time() * 1000))
-    print("\nEsperando joystick\n")
-    event = sense.stick.wait_for_event()
-    fGx = open("GxData.txt", "a")
-    fGx.write(datosGx)
-    milli_secEnd = int(round(time.time() * 1000))
-    fGx.close()
-    milli_secTotal = int(milli_secEnd-milli_secIni)
-    SPS = sample/(milli_secTotal/1000)
-    print("Datos grabados en GxData.txt. Tiempo = %i ms. Muestras = %i, SPS = %f" % (milli_secTotal,sample,SPS),end='\n')
-    stop = 1
-    return
-
-#Bucle de ejecucion
-
-#configuracion del threads
-threading.Thread(target=saveData).start()
-#threading.Thread(target=showrow).start()
-
-while (stop == 0):
+    global img
+    estado = 0
+    arriba=0
+    abajo=0
+    iz=0
+    de=0
+    cara=0
+    cruz=0
     timeIni = int(round(time.time() * 1000))
+    #Estados imagenes según valores accelerometro
+    if (Gz >= 0.9 ):
+        cara=1
+    elif(Gz<=0.1 and Gz>0):
+        cara = 0
+    if(Gy<=-0.9):
+        de=1
+    elif(Gy>=-0.1 and Gy<0):
+        de=0
+    if (Gz <= -0.9):
+        cruz=1
+    elif(Gz>=-0.1 and Gz<0):
+        cruz=0
+    if (Gx >= 0.9):
+        abajo=1
+    elif(Gx<= 0.1 and Gx>0):
+        abajo=0
+    if (Gy >= 0.9):
+        iz=1
+    elif(Gy<= 0.1 and Gy>0):
+        iz=0
+    if(Gx<=-0.9):
+        arriba=1
+    elif(Gx>=-0.1 and Gx<0):
+        arriba=0
+    #Estados Hysteresis
+    if (cara ==1):
+
+        img = sense.load_image("dentro.png") #bocaArriba
+    else: pass
+    if (cruz ==1):
+        img = sense.load_image("fuera.png") #bocaAbajo
+    else: pass
+    if (de==1 or iz==1 or abajo==1 or arriba==1):
+        img = sense.load_image("flecha.png")
+        if (de ==1):
+            #img = sense.load_image("flecha.png")
+            sense.rotation = 0 #flechaDerecha
+        else: pass
+        if (iz ==1):
+            #img = sense.load_image("flecha.png")
+            sense.rotation = 180 #flechaIzquierda
+        else: pass
+        if (arriba ==1):
+            #img = sense.load_image("flecha.png")
+            sense.rotation = 270 #flechaArriba
+        else: pass
+        if (abajo ==1):
+            #img = sense.load_image("flecha.png")
+            sense.rotation = 90 #flechaABAJO
+        else: pass
+
+    #Se muestra la imagen RGB
+    if (estado != sense.rotation):
+        sense.set_pixels(img)
+    timeEnd = int(round(time.time() * 1000))
+    c = (timeEnd - timeIni)
+    #print ("Gx: %f - Gy: %f - Gz: %f - Time: %i" % (Gx,Gy,Gz,c))
+
+
+#########################################################################
+#Declaracion Thread SaveData
+class SaveDataTrhead (threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+#Rutina de autoejecución
+    def run(self):
+
+        global stopthread2,stopthread1, stopthread3,offsetX
+
+        print ("\nStarting " + self.name)
+        #Se crea un fichero de datos nuevo vacio.
+        if os.path.exists("GxData.txt"):
+            print("\nSe elimina GxData.txt anterior.")
+            os.remove("GxData.txt")
+        print("\nSe crea : GxData.txt")
+        fGx = open("GxData.txt", "a")
+        print("\nEsperando joystick para opcion:")
+        #Bucle de captura de entradas del joystick.
+        while stopthread3 == 0:
+            event = sense.stick.wait_for_event()
+            #Boton central: Calibrar acelerometro en posicion de reposo.
+            if (event.direction == "middle"):
+                suma = 0
+                for x in accelArrx:
+                    suma = suma + x
+                offsetX = suma / len(accelArrx)
+                print("\nOffset en X = %f."% offsetX, end='\n')
+            #Otro Boton: Guardar fichero y cerrar programa.
+            else:
+                fGx.write(datosGx)
+                print ("\nExiting " + self.name)
+                stopthread2 = 1
+                time.sleep(500/1000)
+                stopthread1 = 1
+                stopthread3 =  1
+
+#Declaracion Thread 1
+class myThread (threading.Thread):
+   def __init__(self, threadID, name):
+      threading.Thread.__init__(self)
+      self.threadID = threadID
+      self.name = name
+   def run(self):
+      #Se ejecuta la función de adquisición de muestras
+      print ("Starting " + self.name)
+      while stopthread1 == 0:
+          adquisitionData(12)
+      print ("\nExiting " + self.name)
+      sense.clear()
+
+
+#Declaracion Thread 2
+class myThread2 (threading.Thread):
+   def __init__(self, threadID, name):
+      threading.Thread.__init__(self)
+      self.threadID = threadID
+      self.name = name
+   def run(self):
+      print ("Starting " + self.name)
+      while stopthread2 == 0:
+          Dataget(10)
+      print ("\nExiting " + self.name)
+
+#Funcion del thread 1
+def adquisitionData(tiempo):
+    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx
+    offsetGx = 0
+    t0 = time.time()
+    showrow()
+    accelArrx.append (Gx)
+    #secorrige el valor de Gx
+    if (offsetX != 0):
+        offsetGx = Gx - offsetX
+        if (abs(offsetGx) < 0.005): #0.005
+            offsetGx = 0
+        datosGx += ("%f, " % (offsetGx))
+        numSamples = numSamples +1
+    #Se setean el flag de thread para permitir al trhead de adquisición, tomar el dato.
+    event.set()
+    time.sleep(tiempo/1000.0)
+    lapsetime = ((time.time() - t0) * 1000 )
+    print("Gx: %1.4f Gy: %1.4f Gz: %1.4f - #Samples = %i SampleTime = %f ms - IMUTime = %f" % (Gx-offsetX,Gy,Gz,numSamples,lapsetime, timeIMU), end = '\r')
+#Funcion del thread 2
+def Dataget (tiempo):
+    global Gx, Gy, Gz, timeIMU
+    event.wait() # Blocks until the flag becomes true.
+    t0 = time.time()
     if imu.IMURead():
         data = imu.getIMUData()
-        sample += 1
         #Se obtiene el dato de aceleracion en la variable accel
         accel = data["accel"]
         Gx = accel[0]
         Gy = accel[1]
         Gz = accel[2]
-        #Se guardan los datos para tratamiento posterior
-        datosGx += ("%f, " %Gy)
-        #Tiempo de espera
-        #time.sleep(poll_interval*1.0/1000.0)
-        timeEnd = int(round(time.time() * 1000))
-        c = (timeEnd - timeIni)
-        print("Gx: %1.8f - Gy: %1.8f - Gz: %1.8f - Samp = %i - Time: %i ms.   " % (Gx,Gy,Gz,sample,c),end='\r')
+        timeIMU = (time.time() - t0) * 1000
+        #print ("IMU Time : %f ms" %timeIMU)
+    event.clear() # Resets the flag.
+
+# Create new threads
+thread1 = myThread(1, "Thread-1")
+thread2 = myThread2(2, "Thread-2")
+thread3 = SaveDataTrhead(2, "SaveDataTrhead")
+
+# Start new Threads
+thread3.start()
+time.sleep(100/1000)
+thread2.start()
+thread1.start()
+
+
+print ("\nExiting Main Thread")
