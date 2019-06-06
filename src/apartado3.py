@@ -40,6 +40,7 @@ distancia = 0.0
 flag = 0
 t = [0,0,0]
 accX = 0
+previa = 0
 
 SETTINGS_FILE = "RTIMULib"
 
@@ -179,7 +180,7 @@ class myThread2 (threading.Thread):
 
 
 def adquisitionData(tiempo):
-    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx, rawGx
+    global datosGx, datosGy, datosGz, numSamples, accelArrx, Gx, rawGx, previa
     global velocidad, distancia, flag, t, accX
     offsetGx = 0
     t0 = time.time()
@@ -201,10 +202,12 @@ def adquisitionData(tiempo):
     time.sleep(tiempo/1000.0)
     lapsetime = ((time.time() - t0) * 1000)
     deltav = ((offsetGx * 9.8 * (lapsetime / 1000)))
+    deltav += ((offsetGx - previa)/2) * 9.8 * (lapsetime / 1000)
     velocidad = velocidad + deltav
     if (offsetGx == 0) and (abs(velocidad) < 0.05):
         velocidad = 0
     distancia = distancia + (velocidad * lapsetime/1000)
+    previa = offsetGx
     #print("Velocidad = %f m/s, Distancia = %f m - #Samples = %i SampleTime = %2.2f ms" % (velocidad, distancia, numSamples, lapsetime), end = '\r')
     print("Velocidad = %f m/s, Distancia = %f m - #Samples = %i SampleTime = %2.2f ms, Gx: %f "  % ( velocidad, distancia, numSamples, lapsetime, accX - offsetX), end = '\r')
 # Funcion del thread 2
